@@ -12,6 +12,7 @@ module DataMapper
     class DataObjectsAdapter < AbstractAdapter
       extend Chainable
       extend Deprecate
+      include Instrumentation
 
       deprecate :query, :select
 
@@ -230,7 +231,9 @@ module DataMapper
           # DataObjects::Connection.new(uri) will give you back the right
           # driver based on the DataObjects::URI#scheme
           connection_stack = self.connection_stack
-          connection = connection_stack.last || DataObjects::Connection.new(normalized_uri)
+          connection = instrument("connect.adapters.data_mapper") do
+            connection_stack.last || DataObjects::Connection.new(normalized_uri)
+          end
           connection_stack << connection
           connection
         end

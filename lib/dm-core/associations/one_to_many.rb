@@ -2,6 +2,8 @@ module DataMapper
   module Associations
     module OneToMany #:nodoc:
       class Relationship < Associations::Relationship
+        include Instrumentation
+
         # @api semipublic
         alias target_repository_name child_repository_name
 
@@ -54,12 +56,15 @@ module DataMapper
         #
         # @api semipublic
         def get(source, other_query = nil)
-          assert_kind_of 'source', source, source_model
+          instrument("get.one_to_many.data_mapper") do
+            assert_kind_of 'source', source, source_model
 
-          lazy_load(source) unless loaded?(source)
+            lazy_load(source) unless loaded?(source)
 
-          collection = get!(source)
-          other_query.nil? ? collection : collection.all(other_query)
+            collection = get!(source)
+
+            other_query.nil? ? collection : collection.all(other_query)
+          end
         end
 
         # Sets value of association targets (ex.: paragraphs) for given source resource
@@ -94,14 +99,16 @@ module DataMapper
         #
         # @api private
         def lazy_load(source)
-          # SEL: load all related resources in the source collection
-          collection = source.collection
-          if source.saved? && collection.size > 1
-            eager_load(collection)
-          end
+          instrument("lazy_load.one_to_many.data_mapper") do
+            # SEL: load all related resources in the source collection
+            collection = source.collection
+            if source.saved? && collection.size > 1
+              eager_load(collection)
+            end
 
-          unless loaded?(source)
-            set!(source, collection_for(source))
+            unless loaded?(source)
+              set!(source, collection_for(source))
+            end
           end
         end
 

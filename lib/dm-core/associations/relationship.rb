@@ -7,6 +7,7 @@ module DataMapper
     # with methods like get and set overridden.
     class Relationship
       include Extlib::Assertions
+      include Instrumentation
 
       OPTIONS = [ :child_repository_name, :parent_repository_name, :child_key, :parent_key, :min, :max, :inverse, :reader_visibility, :writer_visibility ].to_set
 
@@ -304,14 +305,20 @@ module DataMapper
       #
       # @api private
       def eager_load(source, query = nil)
-        targets = source.model.all(query_for(source, query))
+        instrument("eager_load.relationship.data_mapper", :class => source.class, :key => source.key) do
+          targets = instrument("load.eager_load.relationship.data_mapper") do
+            source.model.all(query_for(source, query))
+          end
 
-        # FIXME: cannot associate targets to m:m collection yet
-        if source.loaded? && !source.kind_of?(ManyToMany::Collection)
-          associate_targets(source, targets)
+          # FIXME: cannot associate targets to m:m collection yet
+          if source.loaded? && !source.kind_of?(ManyToMany::Collection)
+            instrument("associate_targets.eager_load.relationship.data_mapper") do
+              associate_targets(source, targets)
+            end
+          end
+
+          targets
         end
-
-        targets
       end
 
       # Checks if "other end" of association is loaded on given
@@ -627,19 +634,22 @@ module DataMapper
       end
 
       def associate_targets(source, targets)
-        # TODO: create an object that wraps this logic, and when the first
-        # kicker is fired, then it'll load up the collection, and then
-        # populate all the other methods
+        instrument("associate_targets.relationship.data_mapper") do
+          # TODO: create an object that wraps this logic, and when the first
+          # kicker is fired, then it'll load up the collection, and then
+          # populate all the other methods
 
-        target_maps = Hash.new { |hash, key| hash[key] = [] }
+          target_maps = Hash.new { |hash, key| hash[key] = [] }
 
-        targets.each do |target|
-          target_maps[target_key.get(target)] << target
-        end
+          targets.each do |target|
+            target_maps[target_key.get(target)] << target
+          end
 
-        Array(source).each do |source|
-          key = source_key.get(source)
-          eager_load_targets(source, target_maps[key], query)
+          Array(source).each do |source|
+            key = source_key.get(source)
+            eager_load_targets(source, target_maps[key], query)
+          end
+
         end
       end
     end # class Relationship

@@ -1,6 +1,7 @@
 module DataMapper
   class Repository
     include Extlib::Assertions
+    include Instrumentation
     extend Equalizer
 
     equalize :name, :adapter
@@ -142,7 +143,9 @@ module DataMapper
     # @api semipublic
     def read(query)
       return [] unless query.valid?
-      query.model.load(adapter.read(query), query)
+      instrument("read.repository.data_mapper") do
+        query.model.load(adapter.read(query), query)
+      end
     end
 
     # Update the attributes of one or more resource instances
